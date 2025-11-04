@@ -2,35 +2,105 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ระบบจัดตารางสอน</title>
+  <title>ระบบจัดตารางสอนอัตโนมัติ</title>
+  <style>
+    body { font-family: sans-serif; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    button { font-size: 1.2em; padding: 10px; cursor: pointer; }
+    #status { margin-top: 15px; font-weight: bold; }
+  </style>
 </head>
 <body>
 
-  <h1>รายชื่อวิชา (ดึงมาจาก API)</h1>
-
-  <ul id="subject-list">
-    <li>กำลังโหลด...</li>
-  </ul>
+  <h1>ระบบจัดตารางสอนอัตโนมัติ</h1>
+  
+  <button id="generate-button">เริ่มสร้างตารางสอนอัตโนมัติ!</button>
+  
+  <div id="status">สถานะ: รอคำสั่ง...</div>
+  
+  <hr>
+  
+  <h2>ตารางสอน (ตัวอย่าง ม.4/1)</h2>
+  <table id="schedule-table">
+    <thead>
+      <tr>
+        <th>เวลา</th>
+        <th>จันทร์</th>
+        <th>อังคาร</th>
+        <th>พุธ</th>
+        <th>พฤหัสบดี</th>
+        <th>ศุกร์</th>
+      </tr>
+    </thead>
+    <tbody>
+      </tbody>
+  </table>
 
   <script>
-    // เมื่อหน้าเว็บโหลดเสร็จ
-    window.onload = function() {
-      // 1. ไป "ดึง" ข้อมูลจาก API ของเรา
-      fetch('/api/subjects')
-        .then(response => response.json()) // 2. แปลงข้อมูล JSON
-        .then(data => {
-          // 3. เอาข้อมูลมาแสดงผล
-          const listElement = document.getElementById('subject-list');
-          listElement.innerHTML = ''; // ล้างคำว่า "กำลังโหลด..." ทิ้ง
+    const scheduleTable = document.getElementById('schedule-table').getElementsByTagName('tbody')[0];
+    const statusDiv = document.getElementById('status');
+    const generateButton = document.getElementById('generate-button');
 
-          // 4. วนลูปข้อมูลวิชา แล้วสร้าง <li>
-          data.forEach(subject => {
-            const li = document.createElement('li');
-            li.textContent = `${subject.id}: ${subject.name}`;
-            listElement.appendChild(li);
-          });
+    // เมื่อปุ่มถูกคลิก
+    generateButton.onclick = function() {
+      statusDiv.textContent = 'กำลังคำนวณ... (อาจใช้เวลาสักครู่)';
+      statusDiv.style.color = 'blue';
+
+      // 1. ไป "ดึง" ข้อมูลจาก API ใหม่ของเรา
+      fetch('/api/generate-schedule')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            statusDiv.textContent = `สำเร็จ! (${data.message})`;
+            statusDiv.style.color = 'green';
+            
+            // 2. เรียกฟังก์ชันเพื่อวาดตาราง
+            renderSchedule(data.schedule['m4-1']); // เราจะแสดงแค่ตารางของ ม.4/1
+          } else {
+            statusDiv.textContent = `ล้มเหลว: ${data.message}`;
+            statusDiv.style.color = 'red';
+          }
+        })
+        .catch(err => {
+          statusDiv.textContent = 'เกิดข้อผิดพลาดร้ายแรง: ' + err.message;
+          statusDiv.style.color = 'red';
         });
     };
+
+    // ฟังก์ชันสำหรับวาดตาราง
+    function renderSchedule(classSchedule) {
+      scheduleTable.innerHTML = ''; // ล้างตารางเก่า
+
+      // สร้าง 5 แถว (5 คาบ)
+      for (let period = 1; period <= 5; period++) {
+        const row = scheduleTable.insertRow();
+        
+        // คาบที่ (เวลา)
+        const timeCell = row.insertCell();
+        timeCell.textContent = `คาบที่ ${period}`; // (8:00, 9:00, ...)
+
+        // 5 วัน (จันทร์-ศุกร์)
+        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(day => {
+          const cell = row.insertCell();
+          
+          // --- นี่คือจุดที่แก้ไข ---
+          // 1. ดึงบทเรียนสำหรับวันนี้ (ถ้าไม่เจอ เช่น วันพุธ ให้ใช้ [] อาร์เรย์ว่างแทน)
+          const lessonsForDay = classSchedule[day] || []; 
+          // 2. ค้นหาในอาร์เรย์นั้น (ปลอดภัย)
+          const lesson = lessonsForDay.find(l => l.period === period);
+          
+          if (lesson) {
+            cell.innerHTML = `<b>${lesson.subject}</b><br>
+                              <small>${lesson.teacher}</small><br>
+                              <small><i>${lesson.room}</i></small>`;
+          } else {
+            cell.textContent = '---'; // (ข้อมูลจำลองอาจจะไม่ครบ)
+          }
+        });
+      }
+    }
   </script>
 
 </body>
