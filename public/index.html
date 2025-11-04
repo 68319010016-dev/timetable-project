@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ระบบจัดตารางสอน</title>
+</head>
+<body>
+
+  <h1>รายชื่อวิชา (ดึงมาจาก API)</h1>
+
+  <ul id="subject-list">
+    <li>กำลังโหลด...</li>
+  </ul>
+
+  <script>
+    // เมื่อหน้าเว็บโหลดเสร็จ
+    window.onload = function() {
+      // 1. ไป "ดึง" ข้อมูลจาก API ของเรา
+      fetch('/api/subjects')
+        .then(response => response.json()) // 2. แปลงข้อมูล JSON
+        .then(data => {
+          // 3. เอาข้อมูลมาแสดงผล
+          const listElement = document.getElementById('subject-list');
+          listElement.innerHTML = ''; // ล้างคำว่า "กำลังโหลด..." ทิ้ง
+
+          // 4. วนลูปข้อมูลวิชา แล้วสร้าง <li>
+          data.forEach(subject => {
+            const li = document.createElement('li');
+            li.textContent = `${subject.id}: ${subject.name}`;
+            listElement.appendChild(li);
+          });
+        });
+    };
+  </script>
+
+</body>
+</html>

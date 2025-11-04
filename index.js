@@ -1,15 +1,27 @@
-// 1. เรียกใช้ "เครื่องยนต์" Express
+// 1. Initialize Express
 const express = require('express');
 const app = express();
-const port = 3000; // เราจะให้เซิร์ฟเวอร์ทำงานที่พอร์ต 3000
+const port = 3000;
 
-// 2. สร้าง "เส้นทาง" (Route) สำหรับหน้าแรก
-// ถ้ามีคนเข้ามาที่ http://localhost:3000/
-app.get('/', (req, res) => {
-  res.send('สวัสดี! นี่คือเซิร์ฟเวอร์ตารางสอนของฉัน');
+// 2. Serve static files from the 'public' folder
+app.use(express.static('public'));
+
+// 3. Create API Endpoint for subjects
+app.get('/api/subjects', (req, res) => {
+
+  // This is mock data
+  const subjects = [
+    { id: 'C101', name: 'คณิตศาสตร์พื้นฐาน' },
+    { id: 'S201', name: 'วิทยาศาสตร์กายภาพ' },
+    { id: 'T301', name: 'ภาษาไทย' }
+  ];
+
+  // Send data as JSON
+  res.json(subjects);
 });
 
-// 3. สั่งให้เซิร์ฟเวอร์ "สตาร์ท" และรอฟัง
+// 4. Start the server
 app.listen(port, () => {
+  // (บรรทัดนี้ใช้ภาษาไทยได้ เพราะมันอยู่ใน "ข้อความ" ไม่ใช่ "โค้ด")
   console.log(`Server กำลังทำงานที่ http://localhost:${port}`);
 });
