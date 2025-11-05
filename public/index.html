@@ -1,107 +1,317 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>ระบบจัดตารางสอนอัตโนมัติ</title>
+  <title>ระบบตารางสอน (Admin)</title>
   <style>
-    body { font-family: sans-serif; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f4f4f4; }
-    button { font-size: 1.2em; padding: 10px; cursor: pointer; }
-    #status { margin-top: 15px; font-weight: bold; }
+    body { font-family: 'Prompt', Arial, sans-serif; background:#eef4fa; }
+    .centerblock { width: 97%; max-width: 1100px; margin:0 auto; background:#fff; box-shadow:0 2px 16px #c5d7ee44; border-radius:18px; padding:28px 14px 28px 14px; }
+    h1 { color:#1978d6; text-align:center; font-size:2.15em; margin-bottom:7px;}
+    .flexrow { display: flex; gap: 11px; margin-bottom:17px; align-items: center; justify-content: center;}
+    .badge { background: #1978d6; color:#fff; border-radius:7px; font-size:1em; padding:4px 14px; margin-bottom:2px; font-weight:bold;}
+    .select-label { font-size:1.11em; color:#1d70b9;}
+    select { font-size: 1.04em; padding:6px 13px; border-radius:7px; border:1.2px solid #8cb8e9;}
+    button { background: linear-gradient(90deg,#1978d6 70%,#44bee6 100%); color: white; font-size: 1.05em; padding: 10px 23px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    button:hover { background: linear-gradient(90deg,#379EF6 75%,#2ebcf7 100%);}
+    #status { font-size:1.09em; margin-bottom:11px; font-weight:600;}
+    #table-title { text-align: center; margin-top:12px; color:#1762aa; font-weight:600; font-size:1.16em;}
+    table { width:100%; border-collapse:collapse; background:#fafdff; margin-top:12px;}
+    th, td { text-align:center; padding:10px 0; border-bottom:1px solid #e4ecf6; border-right: 1px solid #e6eefd;}
+    th:last-child, td:last-child { border-right:none; }
+    th { background: linear-gradient(90deg,#f3faff 65%,#eaf5fd 100%); color:#0650b8;}
+    tr:nth-child(even) { background: #f7fbfe; }
+    th.day-head, td.day-head { background:#d8eafd; color:#2262a8; font-size:1.04em;}
+    th.breakhead, td.breakcell { background: #ffeecc !important; color:#b38204 !important; font-weight:bold;}
+    td.breakcell { background: #ffeecc !important;}
+    td b { color: #2060bc; font-size: 1em;}
+    td small { color: #47648a; font-size: 0.94em;}
+    @media (max-width:680px) { th, td { font-size:0.92em; } th.day-head { width:66px;} }
+    .hide { display:none; }
   </style>
 </head>
 <body>
-
-  <h1>ระบบจัดตารางสอนอัตโนมัติ</h1>
-  
-  <button id="generate-button">เริ่มสร้างตารางสอนอัตโนมัติ!</button>
-  
-  <div id="status">สถานะ: รอคำสั่ง...</div>
-  
-  <hr>
-  
-  <h2>ตารางสอน (ตัวอย่าง ม.4/1)</h2>
-  <table id="schedule-table">
-    <thead>
-      <tr>
-        <th>เวลา</th>
-        <th>จันทร์</th>
-        <th>อังคาร</th>
-        <th>พุธ</th>
-        <th>พฤหัสบดี</th>
-        <th>ศุกร์</th>
-      </tr>
-    </thead>
-    <tbody>
-      </tbody>
-  </table>
-
+  <div class="centerblock">
+    <h1>ระบบตารางสอน <span class="badge">Admin</span></h1>
+    <div class="flexrow">
+      <button id="generate-button">สร้างตารางใหม่!</button>
+      <button id="save-schedule">บันทึกตารางนี้</button>
+      <button id="validate-btn">ตรวจสอบตารางชนกัน</button>
+      <button id="export-pdf">Export PDF</button>
+      <label class="select-label">มุมมอง:</label>
+      <select id="view-type">
+        <option value="class">ตามห้องเรียน</option>
+        <option value="teacher">ตามครู</option>
+        <option value="subject">ตามรายวิชา</option>
+      </select>
+      <select id="class-select"></select>
+      <select id="teacher-select"></select>
+      <select id="subject-select"></select>
+    </div>
+    <div id="status">สถานะ: ...</div>
+    <h2 id="table-title"></h2>
+    <div id="matrix-container"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
-    const scheduleTable = document.getElementById('schedule-table').getElementsByTagName('tbody')[0];
-    const statusDiv = document.getElementById('status');
+    // setup data
+    const CLASS_LIST = [
+      { id:'m4-1', name: 'ม.4/1'}, {id:'m4-2', name:'ม.4/2'},{id:'m4-3',name:'ม.4/3'},
+      { id:'m5-1',name:'ม.5/1'},{id:'m5-2',name:'ม.5/2'},{id:'m5-3',name:'ม.5/3'},
+      { id:'m6-1',name:'m.6/1'},{id:'m6-2',name:'m.6/2'},{id:'m6-3',name:'m.6/3'}
+    ];
+    const SUBJECTS = {
+      'bio': { id: 'bio', name: 'ชีวะ', roomType: 'standard' },
+      'chem': { id: 'chem', name: 'เคมี', roomType: 'standard' },
+      'phys': { id: 'phys', name: 'ฟิสิกส์', roomType: 'standard' },
+      'math': { id: 'math', name: 'คณิตศาสตร์', roomType: 'standard' },
+      'eng': { id: 'eng', name: 'ภาษาอังกฤษ', roomType: 'standard' },
+      'comp': { id: 'comp', name: 'คอมพิวเตอร์', roomType: 'computer_lab' },
+      'thai': { id: 'thai', name: 'ภาษาไทย', roomType: 'standard' },
+      'pe': { id: 'pe', name: 'พละ', roomType: 'gym' }
+    };
+    const TEACHERS = {
+      'math1': { id: 'math1', subject: 'math' }, 'math2': { id: 'math2', subject: 'math' },
+      'eng1': { id: 'eng1', subject: 'eng' }, 'eng2': { id: 'eng2', subject: 'eng' },
+      'bio1': { id: 'bio1', subject: 'bio' }, 'bio2': { id: 'bio2', subject: 'bio' },
+      'chem1': { id: 'chem1', subject: 'chem' }, 'chem2': { id: 'chem2', subject: 'chem' },
+      'phys1': { id: 'phys1', subject: 'phys' }, 'phys2': { id: 'phys2', subject: 'phys' },
+      'comp1': { id: 'comp1', subject: 'comp' }, 'comp2': { id: 'comp2', subject: 'comp' },
+      'thai1': { id: 'thai1', subject: 'thai' }, 'pe1': { id: 'pe1', subject: 'pe' }
+    };
+    const DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const DAYS_TH = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์'];
+    const BREAK_PERIOD = 4;
+
+    // DOM
+    const classSelect = document.getElementById('class-select');
+    classSelect.innerHTML = CLASS_LIST.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const subjectSelect = document.getElementById('subject-select');
+    subjectSelect.innerHTML = Object.values(SUBJECTS).map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+    const teacherSelect = document.getElementById('teacher-select');
+    teacherSelect.innerHTML = Object.keys(TEACHERS).map(t=>`<option value="${t}">${t}</option>`).join('');
+    
+    const matrixContainer = document.getElementById('matrix-container');
+    const tableTitle = document.getElementById('table-title');
     const generateButton = document.getElementById('generate-button');
+    const saveButton = document.getElementById('save-schedule');
+    const statusDiv = document.getElementById('status');
+    const validateButton = document.getElementById('validate-btn');
+    const viewType = document.getElementById('view-type');
+    const exportBtn = document.getElementById('export-pdf');
 
-    // เมื่อปุ่มถูกคลิก
+    let currentSchedule = null;
+
+    window.onload = function() {
+      let saved = localStorage.getItem("saved_schedule");
+      if (saved) {
+        currentSchedule = JSON.parse(saved);
+        renderScheduleView();
+        statusDiv.textContent = 'ตารางที่บันทึกไว้ในเครื่องของคุณ';
+      }
+    };
     generateButton.onclick = function() {
-      statusDiv.textContent = 'กำลังคำนวณ... (อาจใช้เวลาสักครู่)';
-      statusDiv.style.color = 'blue';
-
-      // 1. ไป "ดึง" ข้อมูลจาก API ใหม่ของเรา
+      statusDiv.textContent = 'กำลังสร้างตาราง...';
       fetch('/api/generate-schedule')
         .then(response => response.json())
         .then(data => {
           if (data.success) {
             statusDiv.textContent = `สำเร็จ! (${data.message})`;
-            statusDiv.style.color = 'green';
-            
-            // 2. เรียกฟังก์ชันเพื่อวาดตาราง
-            renderSchedule(data.schedule['m4-1']); // เราจะแสดงแค่ตารางของ ม.4/1
+            currentSchedule = data.schedule;
+            renderScheduleView();
           } else {
             statusDiv.textContent = `ล้มเหลว: ${data.message}`;
-            statusDiv.style.color = 'red';
+            matrixContainer.innerHTML = '';
           }
         })
         .catch(err => {
-          statusDiv.textContent = 'เกิดข้อผิดพลาดร้ายแรง: ' + err.message;
-          statusDiv.style.color = 'red';
+          statusDiv.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
         });
     };
+    saveButton.onclick = function() {
+      if (currentSchedule) {
+        localStorage.setItem("saved_schedule", JSON.stringify(currentSchedule));
+        statusDiv.textContent = 'บันทึกตารางสำเร็จแล้ว!';
+      } else {
+        statusDiv.textContent = 'ยังไม่มีข้อมูลตารางให้บันทึก';
+      }
+    };
+    validateButton.onclick = async function() {
+      if (!currentSchedule) {
+        alert('ยังไม่มีข้อมูลตาราง');
+        return;
+      }
+      statusDiv.textContent = 'กำลังตรวจสอบ...';
+      const resp = await fetch('/api/validate-schedule', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule: currentSchedule })
+      });
+      const data = await resp.json();
+      if (data.valid) {
+        statusDiv.textContent = '✅ ตารางไม่มีครู/ห้องซ้ำซ้อน';
+      } else {
+        statusDiv.textContent = '❌ ' + data.errors.join('; ');
+      }
+    };
+    viewType.onchange = renderScheduleView;
+    classSelect.onchange = renderScheduleView;
+    teacherSelect.onchange = renderScheduleView;
+    subjectSelect.onchange = renderScheduleView;
 
-    // ฟังก์ชันสำหรับวาดตาราง
-    function renderSchedule(classSchedule) {
-      scheduleTable.innerHTML = ''; // ล้างตารางเก่า
+    exportBtn.onclick = async function() {
+      const matrixDiv = document.getElementById('matrix-container');
+      const { jsPDF } = window.jspdf;
+      await html2canvas(matrixDiv, { scale:2 }).then(canvas => {
+        const img = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation:'landscape', unit:'px', format:'a4'});
+        const margin = 18, pageWidth = pdf.internal.pageSize.getWidth() - margin*2;
+        const pageHeight = pdf.internal.pageSize.getHeight() - margin*2;
+        const imgRatio = canvas.width/canvas.height;
+        let w = pageWidth, h = w/imgRatio;
+        if(h>pageHeight) { h=pageHeight; w=h*imgRatio; }
+        pdf.addImage(img, 'PNG', margin, margin, w, h);
+        // ตั้งชื่อไฟล์ตามมุมมอง
+        let filename = 'ตารางเรียน.pdf';
+        if(viewType.value==='class')
+          filename = 'ตารางห้อง_' + classSelect.value + '.pdf';
+        else if(viewType.value==='teacher')
+          filename = 'ตารางครู_' + teacherSelect.value + '.pdf';
+        else if(viewType.value==='subject')
+          filename = 'ตารางวิชา_' + subjectSelect.value + '.pdf';
+        pdf.save(filename);
+      });
+    };
 
-      // สร้าง 5 แถว (5 คาบ)
-      for (let period = 1; period <= 5; period++) {
-        const row = scheduleTable.insertRow();
-        
-        // คาบที่ (เวลา)
-        const timeCell = row.insertCell();
-        timeCell.textContent = `คาบที่ ${period}`; // (8:00, 9:00, ...)
-
-        // 5 วัน (จันทร์-ศุกร์)
-        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(day => {
-          const cell = row.insertCell();
-          
-          // --- นี่คือจุดที่แก้ไข ---
-          // 1. ดึงบทเรียนสำหรับวันนี้ (ถ้าไม่เจอ เช่น วันพุธ ให้ใช้ [] อาร์เรย์ว่างแทน)
-          const lessonsForDay = classSchedule[day] || []; 
-          // 2. ค้นหาในอาร์เรย์นั้น (ปลอดภัย)
-          const lesson = lessonsForDay.find(l => l.period === period);
-          
-          if (lesson) {
-            cell.innerHTML = `<b>${lesson.subject}</b><br>
-                              <small>${lesson.teacher}</small><br>
-                              <small><i>${lesson.room}</i></small>`;
-          } else {
-            cell.textContent = '---'; // (ข้อมูลจำลองอาจจะไม่ครบ)
-          }
-        });
+    function renderScheduleView() {
+      matrixContainer.innerHTML = '';
+      if (!currentSchedule) return;
+      if (viewType.value === 'class') {
+        renderClassSchedule(classSelect.value);
+      } else if (viewType.value === 'teacher') {
+        renderTeacherMatrixSingle(teacherSelect.value);
+      } else if (viewType.value === 'subject') {
+        renderSubjectMatrixSingle(subjectSelect.value);
       }
     }
-  </script>
 
+    // -------------------- ตาราง matrix ตามห้องเรียน
+    function renderClassSchedule(classId) {
+      tableTitle.innerHTML = `<span class="badge">ตารางสอน ${classSelect.options[classSelect.selectedIndex].text}</span>`;
+      let html = `<table style="width:100%;margin-bottom:24px"><thead><tr>
+      <th class="day-head">วัน/เวลา</th>
+      <th>08:00-09:00<br>คาบ1</th>
+      <th>09:00-10:00<br>คาบ2</th>
+      <th>10:00-11:00<br>คาบ3</th>
+      <th class="breakhead">11:00-12:00<br>พักกลางวัน</th>
+      <th>12:00-13:00<br>คาบ4</th>
+      <th>13:00-14:00<br>คาบ5</th>
+      <th>14:00-15:00<br>คาบ6</th>
+      <th>15:00-16:00<br>คาบ7</th>
+      </tr></thead><tbody>`;
+      const classSchedule = currentSchedule[classId];
+      for (let d = 0; d < DAYS_EN.length; d++) {
+        const day = DAYS_EN[d], dayth = DAYS_TH[d];
+        html += `<tr><td class="day-head">${dayth}</td>`;
+        for (let col = 1; col <= 8; col++) {
+          if (col === BREAK_PERIOD) {
+            html += `<td class="breakcell">พัก</td>`;
+            continue;
+          }
+          let periodMap = { 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 8: 8 };
+          let p = periodMap[col];
+          if (typeof p === "undefined") { html += '<td>-</td>'; continue; }
+          const lessonsForDay = classSchedule[day] || [];
+          const lesson = lessonsForDay.find(l => l.period === p);
+
+          let cell = lesson && lesson.subject ? `<b>${lesson.subject}</b>` : '';
+          if (lesson && lesson.teacher) cell += `<br><small>ครู ${lesson.teacher}</small>`;
+          if (lesson && lesson.room) cell += `<br><small>ห้อง <i>${lesson.room}</i></small>`;
+          html += `<td>${cell}</td>`;
+        }
+        html += `</tr>`;
+      }
+      html += '</tbody></table>';
+      matrixContainer.innerHTML = html;
+    }
+
+    // -------------------- ตาราง matrix ครู 1 ตารางเดียว
+    function renderTeacherMatrixSingle(teacherId) {
+      tableTitle.innerHTML = `<span class="badge">ตารางของครู ${teacherId}</span>`;
+      let html = `<table style="width:100%;margin-bottom:24px"><thead><tr>
+        <th class="day-head">วัน/เวลา</th>
+        <th>08:00-09:00<br>คาบ1</th>
+        <th>09:00-10:00<br>คาบ2</th>
+        <th>10:00-11:00<br>คาบ3</th>
+        <th class="breakhead">11:00-12:00<br>พักกลางวัน</th>
+        <th>12:00-13:00<br>คาบ4</th>
+        <th>13:00-14:00<br>คาบ5</th>
+        <th>14:00-15:00<br>คาบ6</th>
+        <th>15:00-16:00<br>คาบ7</th>
+        </tr></thead><tbody>`;
+      for (let d = 0; d < DAYS_EN.length; d++) {
+        const day = DAYS_EN[d], dayth = DAYS_TH[d];
+        html += `<tr><td class="day-head">${dayth}</td>`;
+        for (let col = 1; col <= 8; col++) {
+          if (col === BREAK_PERIOD) {
+            html += `<td class="breakcell">พัก</td>`;
+            continue;
+          }
+          let periodMap = { 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 8: 8 };
+          let p = periodMap[col];
+          if (typeof p === "undefined") { html += '<td>-</td>'; continue; }
+          let found = '';
+          for (const cl of CLASS_LIST) {
+            const lessonsForDay = (currentSchedule[cl.id]||{})[day]||[];
+            const lesson = lessonsForDay.find(l => l.period === p && l.teacher === teacherId);
+            if (lesson) found = cl.name;
+          }
+          html += `<td>${found ? found : ''}</td>`;
+        }
+        html += `</tr>`;
+      }
+      html += '</tbody></table>';
+      matrixContainer.innerHTML = html;
+    }
+
+    // -------------------- ตาราง matrix วิชา 1 ตารางเดียว
+    function renderSubjectMatrixSingle(subjectName) {
+      tableTitle.innerHTML = `<span class="badge">ตารางของวิชา ${subjectName}</span>`;
+      let html = `<table style="width:100%;margin-bottom:24px"><thead><tr>
+        <th class="day-head">วัน/เวลา</th>
+        <th>08:00-09:00<br>คาบ1</th>
+        <th>09:00-10:00<br>คาบ2</th>
+        <th>10:00-11:00<br>คาบ3</th>
+        <th class="breakhead">11:00-12:00<br>พักกลางวัน</th>
+        <th>12:00-13:00<br>คาบ4</th>
+        <th>13:00-14:00<br>คาบ5</th>
+        <th>14:00-15:00<br>คาบ6</th>
+        <th>15:00-16:00<br>คาบ7</th>
+        </tr></thead><tbody>`;
+      for (let d = 0; d < DAYS_EN.length; d++) {
+        const day = DAYS_EN[d], dayth = DAYS_TH[d];
+        html += `<tr><td class="day-head">${dayth}</td>`;
+        for (let col = 1; col <= 8; col++) {
+          if (col === BREAK_PERIOD) {
+            html += `<td class="breakcell">พัก</td>`;
+            continue;
+          }
+          let periodMap = { 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 8: 8 };
+          let p = periodMap[col];
+          if (typeof p === "undefined") { html += '<td>-</td>'; continue; }
+          let found = '';
+          for (const cl of CLASS_LIST) {
+            const lessonsForDay = (currentSchedule[cl.id]||{})[day]||[];
+            const lesson = lessonsForDay.find(l => l.period === p && l.subject === subjectName);
+            if (lesson) found = cl.name;
+          }
+          html += `<td>${found ? found : ''}</td>`;
+        }
+        html += `</tr>`;
+      }
+      html += '</tbody></table>';
+      matrixContainer.innerHTML = html;
+    }
+  </script>
 </body>
 </html>

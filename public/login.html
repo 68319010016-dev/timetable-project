@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Login ตารางเรียน</title>
+  <style>
+    body { font-family: 'Prompt', Arial, sans-serif; background:#eaf2fc; }
+    .loginbox { margin:80px auto; max-width:390px; background:#fff; border-radius:14px; box-shadow:0 4px 20px #bdd0ed55; padding:32px;}
+    h2 { color:#1978d6; text-align:center;}
+    input[type=text], input[type=password] { width:95%; padding:11px; font-size:1.05em; margin:7px 0; border-radius:7px; border:1px solid #aac4de;}
+    button { margin-top:14px; width:100%; background:#1978d6; color:#fff; font-size:1.13em; border:none; border-radius:8px; padding:12px 0; font-weight:bold;}
+    .err { color: #d52c2c; margin-top:10px;}
+  </style>
+</head>
+<body>
+  <div class="loginbox">
+    <h2>เข้าสู่ระบบตารางเรียน</h2>
+    <input id="user" type="text" placeholder="รหัสนักเรียน / รหัสครู หรือ admin" autocomplete="username" />
+    <input id="pass" type="password" placeholder="วันเกิด เช่น 11/12/2546 หรือ 1234 (admin)" autocomplete="current-password" />
+    <button onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div id="err" class="err"></div>
+  </div>
+  <script>
+    function doLogin() {
+      const user = document.getElementById('user').value.trim();
+      const pass = document.getElementById('pass').value.trim();
+      document.getElementById('err').textContent = '';
+      if(!user || !pass) { document.getElementById('err').textContent = 'โปรดกรอกทุกช่อง'; return; }
+      // MOCK login - ใช้งานจริงเปลี่ยนเป็น fetch('/api/login',...) ได้เลย
+      if(user === 'admin' && pass === '1234') {
+        localStorage.setItem('user_role', 'admin');
+        localStorage.setItem('user_info', JSON.stringify({admin: true}));
+        window.location.href='index.html';
+        return;
+      }
+      // ตัวอย่าง user นักเรียน/ครู ทดสอบ -- ใน production ให้ fetch จาก server แทน
+      const demoUsers = {
+        "61001": { password: "11/12/2546", role:"student", userInfo:{ class_id: "m4-1", name:"สมศักดิ์" } },
+        "math1": { password: "05/03/2521", role:"teacher", userInfo:{ teacher_id:"math1", name:"ครูคณิต 1" } }
+      };
+      if(!demoUsers[user] || demoUsers[user].password !== pass) {
+        document.getElementById('err').textContent = "รหัสหรือวันเกิดไม่ถูกต้อง";
+        return;
+      }
+      localStorage.setItem('user_role', demoUsers[user].role);
+      localStorage.setItem('user_info', JSON.stringify(demoUsers[user].userInfo));
+      window.location.href='index.html';
+    }
+  </script>
+</body>
+</html>

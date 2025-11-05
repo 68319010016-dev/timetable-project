@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ระบบตารางสอน</title>
+  <style>
+    body { font-family: 'Prompt', Arial, sans-serif; background: #eef4fa; }
+    .centerblock { width: 94%; max-width: 1100px; margin: 0 auto; background: #fff; box-shadow: 0 2px 16px #c5d7ee44; border-radius: 17px; padding: 26px 10px 24px 10px; }
+    h1 { color: #1d70b9; text-align: center; font-size: 2em; }
+    #generate-button, #save-schedule, #validate-btn {
+      background: linear-gradient(90deg, #1978d6 70%, #44bee6 100%);
+      color: white; font-size: 1.07em; padding: 11px 25px; border: none; border-radius: 10px;
+      font-weight: bold; cursor: pointer; margin-bottom: 7px; margin-right:10px;
+    }
+    #generate-button:hover, #save-schedule:hover, #validate-btn:hover {
+      background: linear-gradient(90deg,#379EF6 75%, #2ebcf7 100%);}
+    label { font-size: 1.14em; font-weight: 500; color: #1d70b9;}
+    select { font-size: 1.04em; padding: 6px 13px; border-radius: 7px; border: 1.3px solid #a1c4e9; }
+    #status { font-size: 1.09em; margin-bottom: 10px; font-weight: bold;}
+    #table-title { text-align: center; margin-top: 10px; color: #1762aa; font-weight: 600;}
+    table { width: 100%; border-collapse: collapse; background: #fafdff; margin-top: 14px;}
+    th, td { text-align: center; padding: 10px 0; border-bottom: 1px solid #e6edf5;}
+    thead th { background: linear-gradient(90deg, #f3faff 65%, #eaf5fd 100%); color: #0650b8;}
+    th.day-head { background: #d8eafd; color: #2262a8; font-size: 1.07em; width: 90px;}
+    th.breakhead { background: #ffeebb !important; color: #b38204 !important; font-weight: bold;}
+    td b { color: #2060bc; font-size: 1.08em;}
+    td small { color: #47648a; font-size: 0.97em;}
+    td.breakcell { background: #ffeebb !important; color: #a17900 !important; font-weight: bold;}
+    .breakcell { background: #ffefc7 !important;}
+  </style>
+</head>
+<body>
+  <div class="centerblock">
+    <h1>ระบบตารางสอน</h1>
+    <button id="generate-button">สร้างตารางใหม่!</button>
+    <button id="save-schedule">บันทึกตารางนี้</button>
+    <button id="validate-btn">ตรวจสอบตารางชนกัน</button>
+    <label>เลือกห้อง:
+      <select id="class-select">
+        <option value="m4-1">ม.4/1</option>
+        <option value="m4-2">ม.4/2</option>
+        <option value="m4-3">ม.4/3</option>
+      </select>
+    </label>
+    <div id="status">สถานะ: ...</div>
+    <h2 id="table-title">ตารางสอน (ม.4/1)</h2>
+    <table id="schedule-table">
+      <thead>
+        <tr>
+          <th class="day-head">วัน/เวลา</th>
+          <th>08:00-09:00<br>คาบ1</th>
+          <th>09:00-10:00<br>คาบ2</th>
+          <th>10:00-11:00<br>คาบ3</th>
+          <th class="breakhead">11:00-12:00<br>พักกลางวัน</th>
+          <th>12:00-13:00<br>คาบ4</th>
+          <th>13:00-14:00<br>คาบ5</th>
+          <th>14:00-15:00<br>คาบ6</th>
+          <th>15:00-16:00<br>คาบ7</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="validate-result" style="color:#e31b3b;margin-top:10px;"></div>
+  </div>
+  <script>
+    const DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const DAYS_TH = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์'];
+    const PERIODS = [1,2,3,5,6,7,8];
+    const BREAK_PERIOD = 4;
+
+    const scheduleTable = document.getElementById('schedule-table').getElementsByTagName('tbody')[0];
+    const statusDiv = document.getElementById('status');
+    const generateButton = document.getElementById('generate-button');
+    const saveButton = document.getElementById('save-schedule');
+    const classSelect = document.getElementById('class-select');
+    const tableTitle = document.getElementById('table-title');
+    let currentSchedule = null;
+
+    window.onload = function() {
+      let saved = localStorage.getItem("saved_schedule");
+      if (saved) {
+        currentSchedule = JSON.parse(saved);
+        renderSchedule(classSelect.value);
+        statusDiv.textContent = 'ตารางที่บันทึกไว้ในเครื่องของคุณ';
+      }
+    };
+
+    generateButton.onclick = function() {
+      statusDiv.textContent = 'กำลังสร้างตาราง...';
+      fetch('/api/generate-schedule')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            statusDiv.textContent = `สำเร็จ! (${data.message})`;
+            currentSchedule = data.schedule;
+            renderSchedule(classSelect.value);
+          } else {
+            statusDiv.textContent = `ล้มเหลว: ${data.message}`;
+            currentSchedule = null;
+            scheduleTable.innerHTML = '';
+          }
+        })
+        .catch(err => {
+          statusDiv.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+        });
+    };
+
+    saveButton.onclick = function() {
+      if (currentSchedule) {
+        localStorage.setItem("saved_schedule", JSON.stringify(currentSchedule));
+        statusDiv.textContent = 'บันทึกตารางสำเร็จแล้ว!';
+      } else {
+        statusDiv.textContent = 'ยังไม่มีข้อมูลตารางให้บันทึก';
+      }
+    };
+
+    classSelect.onchange = function() {
+      if (currentSchedule) renderSchedule(classSelect.value);
+    };
+
+    function renderSchedule(classId) {
+      const classSchedule = currentSchedule[classId];
+      tableTitle.textContent = `ตารางสอน (${classSelect.options[classSelect.selectedIndex].text})`;
+      scheduleTable.innerHTML = '';
+      for (let d = 0; d < DAYS_EN.length; d++) {
+        const day = DAYS_EN[d], dayth = DAYS_TH[d];
+        const row = scheduleTable.insertRow();
+        const dayCell = row.insertCell();
+        dayCell.className = "day-head";
+        dayCell.innerHTML = dayth;
+        for (let col = 1; col <= 8; col++) {
+          if (col === BREAK_PERIOD) {
+            const cell = row.insertCell();
+            cell.className = 'breakcell';
+            cell.innerHTML = "พัก";
+            continue;
+          }
+          let periodMap = {1:1, 2:2, 3:3, 5:5, 6:6, 7:7, 8:8};
+          let p = periodMap[col];
+          if (typeof p === "undefined") { row.insertCell().innerHTML = '-'; continue; }
+          const cell = row.insertCell();
+          const lessonsForDay = classSchedule ? classSchedule[day] || [] : [];
+          const lesson = lessonsForDay.find(l => l.period === p);
+          if (lesson && lesson.subject) {
+            let html = `<b>${lesson.subject}</b>`;
+            if (lesson.teacher) html += `<br><small>ครู ${lesson.teacher}</small>`;
+            if (lesson.room) html += `<br><small>ห้อง <i>${lesson.room}</i></small>`;
+            cell.innerHTML = html;
+          } else {
+            cell.innerHTML = '';
+          }
+        }
+      }
+    }
+
+    // ปุ่มตรวจสอบตารางชนกัน
+    document.getElementById('validate-btn').onclick = async function() {
+      if (!currentSchedule) {
+        document.getElementById('validate-result').textContent = 'ยังไม่มีข้อมูลตาราง!';
+        return;
+      }
+      document.getElementById('validate-result').textContent = 'กำลังตรวจสอบ...';
+      const resp = await fetch('/api/validate-schedule', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule: currentSchedule })
+      });
+      const data = await resp.json();
+      if (data.valid) {
+        document.getElementById('validate-result').textContent = '✅ ตารางไม่มีครู/ห้องซ้ำซ้อน';
+      } else {
+        document.getElementById('validate-result').innerHTML = '❌ พบปัญหา:<br>' + data.errors.map(e=>`<div>${e}</div>`).join('');
+      }
+    };
+  </script>
+</body>
+</html>
